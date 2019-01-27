@@ -50,11 +50,11 @@ fn main() {
     match members {
         Ok(v) => {
             let json_data: Value = from_value(v).unwrap();
-            println!("{:?}\n", json_data);
+            //println!("{:?}\n", json_data);
             let slice = json_data["items"].clone();
-            println!("{:?}\n", slice);
+            //println!("{:?}\n", slice);
             let users: Vec<User> = from_value(slice).unwrap();
-            println!("{:?}\n", users);
+            //println!("{:?}\n", users);
             
             let user = &users[0];
 
