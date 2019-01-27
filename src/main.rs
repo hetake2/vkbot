@@ -1,11 +1,11 @@
-#![allow(dead_code, unused_imports)]
+//#![allow(dead_code, unused_imports)]
 
 extern crate rvk;
 extern crate serde_json;
 
 use std::{env, io};
 
-use rvk::{methods::*, objects::user::User, APIClient, Params};
+use rvk::{methods::*, methods::groups, objects::user::User, APIClient, Params};
 use serde_json::from_value;
 
 fn main() {
@@ -35,23 +35,43 @@ fn main() {
     let mut api = APIClient::new(token.trim().to_string());
 
     // Create a HashMap to store parameters.
-    let mut params = Params::new();
+    let mut params_users = Params::new();
+    let mut params_groups = Params::new();
 
     // Используется связка "поле + значение".
-    params.insert("user_ids".into(), "528551383".into());
+    //params_users.insert("user_ids".into(), "528551383".into());
+    
+    params_groups.insert("group_id".into(), "74314716".into());
+    //params_groups.insert("sort".into(), "id_asc".into());
+    //params_groups.insert("offset".into(), "0".into());
+    //params_groups.insert("count".into(), "1".into());
+    params_groups.insert("fields".into(), "sex".into());
+    println!("\nПередаём следующие данные: {:?}\n", params_groups);
+    let members = groups::get_members(&api, params_groups);
+    //let res = users::get(&api, params_users);
 
-    let res = users::get(&api, params);
-
-    match res {
-        Ok(v) => { // v is `serde_json::Value`
+    match members {
+        Ok(v) => {
             let users: Vec<User> = from_value(v).unwrap();
             let user = &users[0];
-
             println!(
-                "User #{} is {} {}.",
+                "User #{} {} {}", 
                 user.id, user.first_name, user.last_name
             );
         }
-        Err(e) => println!("{}", e),
+        Err(e) => println!("{}", e), 
     };
+
+    // match res {
+    //     Ok(v) => { // v is `serde_json::Value`
+    //         let users: Vec<User> = from_value(v).unwrap();
+    //         let user = &users[0];
+
+    //         println!(
+    //             "User #{} is {} {}.",
+    //             user.id, user.first_name, user.last_name
+    //         );
+    //     }
+    //     Err(e) => println!("{}", e),
+    // };
 }
