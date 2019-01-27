@@ -3,10 +3,10 @@
 extern crate rvk;
 extern crate serde_json;
 
-use std::{env, io};
+use std::io;
 
-use rvk::{methods::*, methods::groups, objects::user::User, APIClient, Params};
-use serde_json::from_value;
+use rvk::{methods::groups, objects::user::User, APIClient, Params};
+use serde_json::*;
 
 fn main() {
 
@@ -32,46 +32,38 @@ fn main() {
     };
 
     // Create an API Client.
-    let mut api = APIClient::new(token.trim().to_string());
+    let api = APIClient::new(token.trim().to_string());
 
     // Create a HashMap to store parameters.
-    let mut params_users = Params::new();
     let mut params_groups = Params::new();
 
     // Используется связка "поле + значение".
-    //params_users.insert("user_ids".into(), "528551383".into());
+
+    params_groups.insert("group_id".into(), "61440523".into());
+    params_groups.insert("count".into(), "10".into());
+    params_groups.insert("fields".into(), "sex, city, bdate, is_closed".into());
     
-    params_groups.insert("group_id".into(), "74314716".into());
-    //params_groups.insert("sort".into(), "id_asc".into());
-    //params_groups.insert("offset".into(), "0".into());
-    //params_groups.insert("count".into(), "1".into());
-    params_groups.insert("fields".into(), "sex".into());
     println!("\nПередаём следующие данные: {:?}\n", params_groups);
+    
     let members = groups::get_members(&api, params_groups);
-    //let res = users::get(&api, params_users);
 
     match members {
         Ok(v) => {
-            let users: Vec<User> = from_value(v).unwrap();
+            let json_data: Value = from_value(v).unwrap();
+            println!("{:?}\n", json_data);
+            let slice = json_data["items"].clone();
+            println!("{:?}\n", slice);
+            let users: Vec<User> = from_value(slice).unwrap();
+            println!("{:?}\n", users);
+            
             let user = &users[0];
+
             println!(
-                "User #{} {} {}", 
-                user.id, user.first_name, user.last_name
+                "User #{}'s Info:\nName: {} {}\nBirthday: {:?}\nCity: {:?}\nIs closed:{:?}",
+                user.id, user.first_name, user.last_name, user.bdate, user.city, user.is_closed
             );
+            
         }
         Err(e) => println!("{}", e), 
     };
-
-    // match res {
-    //     Ok(v) => { // v is `serde_json::Value`
-    //         let users: Vec<User> = from_value(v).unwrap();
-    //         let user = &users[0];
-
-    //         println!(
-    //             "User #{} is {} {}.",
-    //             user.id, user.first_name, user.last_name
-    //         );
-    //     }
-    //     Err(e) => println!("{}", e),
-    // };
 }
