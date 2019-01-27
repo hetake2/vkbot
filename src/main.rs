@@ -21,7 +21,7 @@ fn main() {
 
     let api_version: String = "5.92".to_string();
 
-    println!("Вставьте эту ссылку в браузер:\nhttps://oauth.vk.com/authorize?client_id={}&display=page&redirect_uri=https://oauth.vk.com/blank.html/callback&scope=friends&response_type=token&v={}\n",
+    println!("\nВставьте эту ссылку в браузер:\nhttps://oauth.vk.com/authorize?client_id={}&display=page&redirect_uri=https://oauth.vk.com/blank.html/callback&scope=friends&response_type=token&v={}\n",
     client_id.trim(), api_version);
 
     println!("И введите полученный access_token:"); 
@@ -56,14 +56,14 @@ fn main() {
             let users: Vec<User> = from_value(slice).unwrap();
             //println!("{:?}\n", users);
             
-            let user = &users[0];
+            for user in &users {
 
-            println!(
-                "User #{}'s Info:\nName: {} {}\nBirthday: {:?}\nCity: {:?}\nIs closed:{:?}",
-                user.id, user.first_name, user.last_name, user.bdate, user.city, user.is_closed
-            );
-            
+                println!(
+                    "User ID: {:?}\nName: {} {}\nBirthday: {:?}\nSex: {:?}\nCity: {:?}\n",
+                    user.id, user.first_name, user.last_name, user.bdate, user.sex, user.city 
+                );
+            };
         }
-        Err(e) => println!("{}", e), 
+        Err(e) => println!("{}", e)
     };
 }
