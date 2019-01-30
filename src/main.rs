@@ -4,32 +4,24 @@ extern crate rvk;
 extern crate serde_json;
 
 use std::io;
-
 use rvk::{methods::groups, objects::user::User, APIClient, Params};
 use serde_json::*;
 
-fn main() {
-
+fn get_input(text: std::string::String) -> std::string::String {
+    println!("{}", text);
     let input = io::stdin();
+    let mut buf = String::new();
+    input.read_line(&mut buf).unwrap();
+    buf
+}
 
-    println!("Введите свой client_id:");
-    let client_id = { // 6835330
-        let mut buf = String::new();
-        input.read_line(&mut buf).unwrap();
-        buf
-    };
-
+fn main() { // 6835330
+    let client_id = get_input("Введите свой client_id:".to_string());
     let api_version: String = "5.92".to_string();
-
     println!("\nВставьте эту ссылку в браузер:\nhttps://oauth.vk.com/authorize?client_id={}&display=page&redirect_uri=https://oauth.vk.com/blank.html/callback&scope=friends&response_type=token&v={}\n",
     client_id.trim(), api_version);
-
-    println!("И введите полученный access_token:"); 
-    let token = {
-        let mut buf = String::new();
-        input.read_line(&mut buf).unwrap();
-        buf
-    };
+    // Getting input token
+    let token = get_input("И введите полученный access_token:".to_string());
 
     // Create an API Client.
     let api = APIClient::new(token.trim().to_string());
@@ -38,7 +30,6 @@ fn main() {
     let mut params_groups = Params::new();
 
     // Используется связка "поле + значение".
-
     params_groups.insert("group_id".into(), "61440523".into());
     params_groups.insert("count".into(), "10".into());
     params_groups.insert("fields".into(), "sex, city, bdate, is_closed".into());
