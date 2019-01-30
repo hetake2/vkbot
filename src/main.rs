@@ -4,20 +4,19 @@ extern crate rvk;
 extern crate serde_json;
 
 use std::io;
-
 use rvk::{methods::groups, objects::user::User, APIClient, Params};
 use serde_json::*;
 
-fn main() {
-
+fn get_input() -> std::string::String {
     let input = io::stdin();
+    let mut buf = String::new();
+    input.read_line(&mut buf).unwrap();
+    buf
+}
 
-    println!("Введите свой client_id:");
-    let client_id = { // 6835330
-        let mut buf = String::new();
-        input.read_line(&mut buf).unwrap();
-        buf
-    };
+fn main() {
+    println!("Введите свой client_id:"); // 6835330
+    let client_id = get_input();
 
     let api_version: String = "5.92".to_string();
 
@@ -25,11 +24,7 @@ fn main() {
     client_id.trim(), api_version);
 
     println!("И введите полученный access_token:"); 
-    let token = {
-        let mut buf = String::new();
-        input.read_line(&mut buf).unwrap();
-        buf
-    };
+    let token = get_input();
 
     // Create an API Client.
     let api = APIClient::new(token.trim().to_string());
