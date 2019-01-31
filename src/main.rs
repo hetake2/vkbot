@@ -5,18 +5,19 @@ extern crate serde_json;
 
 use std::io;
 use rvk::{methods::groups, objects::user::User, APIClient, Params};
-use serde_json::*;
+use serde_json::{from_value, Value};
 
-fn get_input(text: std::string::String) -> std::string::String {
-    println!("{}", text);
-    let input = io::stdin();
+fn get_input<T>(text: T) -> String 
+    where T: std::string::ToString
+{
+    println!("{}", text.to_string());
     let mut buf = String::new();
-    input.read_line(&mut buf).unwrap();
+    io::stdin().read_line(&mut buf).unwrap();
     buf
 }
 
 fn main() { // 6835330
-    let client_id = get_input("Введите свой client_id:".to_string());
+    let client_id = get_input("Введите свой client_id:");
     let api_version: String = "5.92".to_string();
     println!("\nВставьте эту ссылку в браузер:\nhttps://oauth.vk.com/authorize?client_id={}&display=page&redirect_uri=https://oauth.vk.com/blank.html/callback&scope=friends&response_type=token&v={}\n",
     client_id.trim(), api_version);
