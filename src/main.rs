@@ -5,6 +5,7 @@ extern crate serde_json;
 extern crate open;
 
 use std::io;
+use std::fs::OpenOptions;
 use rvk::{methods::groups, objects::user::User, APIClient, Params};
 use serde_json::{json, to_writer_pretty, from_value, Value, from_reader};
 use std::fs::File;
@@ -31,7 +32,7 @@ fn get_json_data(filename: &str) -> Value
 
 fn main() {
     let mut data = get_json_data("login.json");
-    let f = File::open("login.json").unwrap();
+    let f = OpenOptions::new().write(true).open("login.json").unwrap();
     let w = BufWriter::new(f);
 
     // Getting client_id's input.
@@ -44,7 +45,7 @@ fn main() {
 
     // VK API version.  
     let api_version: String = "5.92".to_string();
-    let f = File::open("login.json").unwrap();
+    let f = OpenOptions::new().write(true).open("login.json").unwrap();
     let w = BufWriter::new(f);
     // Getting token's input.
     let mut token = data["token"].as_str().unwrap().to_string();
