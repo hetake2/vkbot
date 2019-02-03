@@ -5,8 +5,12 @@ extern crate serde_json;
 extern crate open;
 
 use std::io;
+use std::fs::OpenOptions;
 use rvk::{methods::groups, objects::user::User, APIClient, Params};
-use serde_json::{from_value, Value};
+use serde_json::{json, to_writer_pretty, from_value, Value, from_reader};
+use std::fs::File;
+use std::io::BufReader;
+use std::io::BufWriter;
 
 // Easy input function.
 fn get_input<T>(text: T) -> String 
@@ -15,30 +19,47 @@ fn get_input<T>(text: T) -> String
     println!("{}", text.to_string());
     let mut buf = String::new();
     io::stdin().read_line(&mut buf).unwrap();
-    buf
+    buf.trim().to_string()
+}
+
+// JSON reader
+fn get_json_data(filename: &str) -> Value
+{
+    let file = File::open(filename).unwrap();
+    let reader = BufReader::new(file);
+    from_reader(reader).unwrap()
 }
 
 fn main() {
+    let mut data = get_json_data("login.json");
+    let f = OpenOptions::new().write(true).open("login.json").unwrap();
+    let w = BufWriter::new(f);
+
     // Getting client_id's input.
-    let client_id_save = "6835330".to_string();
-    let client_id = if client_id_save != "" { client_id_save } 
-                    else { get_input("Введите свой client_id:") };
+    let mut client_id = data["client_id"].as_str().unwrap().to_string();
+    if client_id == "" {
+		client_id = get_input("Введите свой client_id:");
+        data["client_id"] = json!(client_id);
+        to_writer_pretty(w, &data).unwrap();
+	};
 
     // VK API version.  
     let api_version: String = "5.92".to_string();
-    
+    let f = OpenOptions::new().write(true).open("login.json").unwrap();
+    let w = BufWriter::new(f);
     // Getting token's input.
-    let token_save = "".to_string();
-    let token = if token_save != "" { token_save } 
-                else {
-                    let url = format!("https://oauth.vk.com/authorize?client_id={}&display=page&redirect_uri=https://oauth.vk.com/blank.html/callback&scope=friends&response_type=token&v={}",
-                    client_id.trim(), api_version);  
-                    open::that(url);
-                    get_input("Введите полученный access_token из открывшейся страницы:") 
-                };
-    
+    let mut token = data["token"].as_str().unwrap().to_string();
+    if token == "" {
+        let url = format!("https://oauth.vk.com/authorize?client_id={}&display=page&redirect_uri=https://oauth.vk.com/blank.html/callback&scope=friends&response_type=token&v={}",
+        client_id, api_version);  
+        open::that(url).unwrap();
+        token = get_input("Введите полученный access_token из открывшейся страницы:");
+        data["token"] = json!(token);
+        to_writer_pretty(w, &data).unwrap();
+    };
+    println!("token {}", token);
     // Create an API Client.
-    let api = APIClient::new(token.trim().to_string());
+    let api = APIClient::new(token.to_string());
     
     // Create a HashMap to store parameters.
     let mut count_offset = 0;
