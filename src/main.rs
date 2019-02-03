@@ -32,29 +32,31 @@ fn get_json_data(filename: &str) -> Value
 
 fn main() {
     let mut data = get_json_data("login.json");
-    let f = OpenOptions::new().write(true).open("login.json").unwrap();
-    let w = BufWriter::new(f);
-
     // Getting client_id's input.
     let mut client_id = data["client_id"].as_str().unwrap().to_string();
+    
     if client_id == "" {
 		client_id = get_input("Введите свой client_id:");
         data["client_id"] = json!(client_id);
+        let f = OpenOptions::new().write(true).open("login.json").unwrap();
+        let w = BufWriter::new(f);
         to_writer_pretty(w, &data).unwrap();
 	};
 
     // VK API version.  
     let api_version: String = "5.92".to_string();
-    let f = OpenOptions::new().write(true).open("login.json").unwrap();
-    let w = BufWriter::new(f);
+    
     // Getting token's input.
     let mut token = data["token"].as_str().unwrap().to_string();
+    
     if token == "" {
         let url = format!("https://oauth.vk.com/authorize?client_id={}&display=page&redirect_uri=https://oauth.vk.com/blank.html/callback&scope=friends&response_type=token&v={}",
         client_id, api_version);  
         open::that(url).unwrap();
         token = get_input("Введите полученный access_token из открывшейся страницы:");
         data["token"] = json!(token);
+        let f = OpenOptions::new().write(true).open("login.json").unwrap();
+        let w = BufWriter::new(f);
         to_writer_pretty(w, &data).unwrap();
     };
     println!("token {}", token);
