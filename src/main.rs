@@ -66,13 +66,14 @@ fn main() {
     let inc_offset = 10; // Default is 0, Max is 1000.
 
     // URL on get_members VK api: https://vk.com/dev/groups.getMembers
-    let mut params_groups = Params::new();
-    
-    // Adding some "Key" + "Value" to our Hashmap.
-    params_groups.insert("group_id".into(), "61440523".into());
-    params_groups.insert("count".into(), "10".into());
-    params_groups.insert("offset".into(), "0".to_string().into());
-    params_groups.insert("fields".into(), "sex, city, bdate, is_closed".into());
+    let mut params_groups : Params = from_value(json!(
+        {
+            "group_id" : "61440523",
+            "count" : "10",
+            "offset" : "0",
+            "fields" : "sex, city, bdate, is_closed"
+        }
+    )).unwrap();
         
     println!("\nПередаём следующие данные: {:?}\n", params_groups);
     
