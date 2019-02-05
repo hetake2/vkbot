@@ -6,7 +6,7 @@ extern crate open;
 
 use std::io;
 use std::fs::OpenOptions;
-use rvk::{methods::groups, objects::user::User, APIClient, Params};
+use rvk::{methods::groups, APIClient, Params};
 use serde_json::{json, to_writer_pretty, from_value, Value, from_reader};
 use std::path::Path;
 use std::io::BufReader;
@@ -31,7 +31,7 @@ fn get_json_data(filename: &Path) -> Value {
             .open(filename)
             .unwrap();
         let w = BufWriter::new(file);
-        let _t = to_writer_pretty(w, &json!({
+        let t = to_writer_pretty(w, &json!({
             "token" : "",
             "client_id" : ""
         })).unwrap();
@@ -85,32 +85,34 @@ fn main() {
     let mut params_groups: Params = from_value(json!(
         {
             "group_id" : "61440523",
-            "count" : "150",
-            "offset" : "0",
+            "count" : "1",
+            "offset" : "1",
             "fields" : "sex, city, bdate"
         }
     )).unwrap();
-        
+
     println!("\nПередаём следующие данные: {:?}\n", params_groups);
     
-    let mut stop = "1".to_string(); // переменная остановки
+    let mut stop = "1".to_string(); // "While"'s exit.
     while stop.trim() == "1" {
         let members = groups::get_members(&api, params_groups.clone());
         match members {
             Ok(v) => {
                 let json_data: Value = from_value(v).unwrap();
                 //println!("{:?}\n", json_data);
-                let slice = json_data["items"].clone();
+                //let slice = json_data["items"].clone();
                 //println!("{:?}\n", slice);
-                let users: Vec<User> = from_value(slice).unwrap();
-                println!("{:?}\n", users);
+                //let users: Vec<User> = from_value(slice).unwrap();
+                //println!("{:?}\n", users);
+
+                let f = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .open("accounts.json")
+                .unwrap();
+                let w = BufWriter::new(f);
+                to_writer_pretty(w, &json_data).unwrap();
                 
-                // for user in &users {
-                //     println!(
-                //         "User ID: {:?}\nName: {} {}\nBirthday: {:?}\nSex: {:?}\nCity: {:?}\n",
-                //         user.id, user.first_name, user.last_name, user.bdate, user.sex, user.city 
-                //     );
-                // };
             }
             Err(e) => println!("{}", e)
         };
