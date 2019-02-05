@@ -8,7 +8,6 @@ use std::io;
 use std::fs::OpenOptions;
 use rvk::{methods::groups, objects::user::User, APIClient, Params};
 use serde_json::{json, to_writer_pretty, from_value, Value, from_reader};
-use std::fs::File;
 use std::path::Path;
 use std::io::BufReader;
 use std::io::BufWriter;
@@ -25,10 +24,20 @@ fn get_input<T>(text: T) -> String
 
 // JSON reader, that also creates a file with the same name if it doesn't exist.
 fn get_json_data(filename: &Path) -> Value {
+    if !filename.exists() {
+        let file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(filename)
+            .unwrap();
+        let w = BufWriter::new(file);
+        let _t = to_writer_pretty(w, &json!({
+            "token" : "",
+            "client_id" : ""
+        })).unwrap();
+    };
     let file = OpenOptions::new()
         .read(true)
-        .write(true)
-        .create(true)
         .open(filename)
         .unwrap();
     let reader = BufReader::new(file);
