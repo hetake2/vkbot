@@ -9,12 +9,13 @@ use std::fs::OpenOptions;
 use rvk::{methods::groups, objects::user::User, APIClient, Params};
 use serde_json::{json, to_writer_pretty, from_value, Value, from_reader};
 use std::fs::File;
+use std::path::Path;
 use std::io::BufReader;
 use std::io::BufWriter;
 
 // Easy input function.
 fn get_input<T>(text: T) -> String 
-    where T: std::string::ToString
+    where T: ToString
 {
     println!("{}", text.to_string());
     let mut buf = String::new();
@@ -22,31 +23,35 @@ fn get_input<T>(text: T) -> String
     buf.trim().to_string()
 }
 
-// JSON reader
-fn get_json_data(filename: &str) -> Value
-{
-    let file = File::open(filename).unwrap();
+// JSON reader, that also creates a file with the same name if it doesn't exist.
+fn get_json_data(filename: &Path) -> Value {
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(filename)
+        .unwrap();
     let reader = BufReader::new(file);
     from_reader(reader).unwrap()
 }
 
 fn main() {
-    let mut data = get_json_data("login.json");
-    let f = OpenOptions::new().write(true).open("login.json").unwrap();
-    let w = BufWriter::new(f);
+    let path_of_login = Path::new("login.json");
+    let mut data = get_json_data(path_of_login);
 
     // Getting client_id's input.
     let mut client_id = data["client_id"].as_str().unwrap().to_string();
     if client_id == "" {
 		client_id = get_input("Введите свой client_id:");
         data["client_id"] = json!(client_id);
+        let f = OpenOptions::new().write(true).open("login.json").unwrap();
+        let w = BufWriter::new(f);
         to_writer_pretty(w, &data).unwrap();
 	};
 
     // VK API version.  
     let api_version: String = "5.92".to_string();
-    let f = OpenOptions::new().write(true).open("login.json").unwrap();
-    let w = BufWriter::new(f);
+
     // Getting token's input.
     let mut token = data["token"].as_str().unwrap().to_string();
     if token == "" {
@@ -55,23 +60,25 @@ fn main() {
         open::that(url).unwrap();
         token = get_input("Введите полученный access_token из открывшейся страницы:");
         data["token"] = json!(token);
+        let f = OpenOptions::new().write(true).open("login.json").unwrap();
+        let w = BufWriter::new(f);
         to_writer_pretty(w, &data).unwrap();
     };
-    println!("token {}", token);
+
     // Create an API Client.
-    let api = APIClient::new(token.to_string());
+    let api = APIClient::new(token);
     
     // Create a HashMap to store parameters.
     let mut count_offset = 0;
     let inc_offset = 10; // Default is 0, Max is 1000.
 
-    // URL on get_members VK api: https://vk.com/dev/groups.getMembers
-    let mut params_groups : Params = from_value(json!(
+    // URL on get_members VK API: https://vk.com/dev/groups.getMembers
+    let mut params_groups: Params = from_value(json!(
         {
             "group_id" : "61440523",
-            "count" : "10",
+            "count" : "150",
             "offset" : "0",
-            "fields" : "sex, city, bdate, is_closed"
+            "fields" : "sex, city, bdate"
         }
     )).unwrap();
         
@@ -87,14 +94,14 @@ fn main() {
                 let slice = json_data["items"].clone();
                 //println!("{:?}\n", slice);
                 let users: Vec<User> = from_value(slice).unwrap();
-                //println!("{:?}\n", users);
+                println!("{:?}\n", users);
                 
-                for user in &users {
-                    println!(
-                        "User ID: {:?}\nName: {} {}\nBirthday: {:?}\nSex: {:?}\nCity: {:?}\n",
-                        user.id, user.first_name, user.last_name, user.bdate, user.sex, user.city 
-                    );
-                };
+                // for user in &users {
+                //     println!(
+                //         "User ID: {:?}\nName: {} {}\nBirthday: {:?}\nSex: {:?}\nCity: {:?}\n",
+                //         user.id, user.first_name, user.last_name, user.bdate, user.sex, user.city 
+                //     );
+                // };
             }
             Err(e) => println!("{}", e)
         };
