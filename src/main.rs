@@ -12,6 +12,12 @@ use std::path::Path;
 use std::io::BufReader;
 use std::io::BufWriter;
 
+// File config for auth
+const LOGIN_FILE : &str = "login.json";
+
+// VK API Version
+const API_VERSION : &str = "5.92";
+
 // Easy input function.
 fn get_input<T>(text: T) -> String 
     where T: ToString
@@ -22,8 +28,57 @@ fn get_input<T>(text: T) -> String
     buf.trim().to_string()
 }
 
+fn check_token(token : String) -> bool {
+    let api = APIClient::new(token);
+    let result = groups::get_members(&api, from_value(json!({
+        "group_id" : "61440523"
+    })).unwrap());
+    match result {
+        Ok(_v) => { return true }
+        Err(_e) => { return false}
+    };
+}
+
+fn get_data_with_value(key: &str) -> (Value, String) {
+    let v = get_json_data(LOGIN_FILE);
+    let s = v[key].as_str().unwrap().to_string();
+    (v, s)
+}
+
+fn get_token(client_id: String) -> String {
+    let (mut data, mut token) = get_data_with_value("token");
+    if !check_token(token.clone()) {
+        let url = format!("https://oauth.vk.com/authorize?client_id={}&display=page&redirect_uri=https://oauth.vk.com/blank.html/callback&scope=friends&response_type=token&v={}",
+        client_id, API_VERSION);
+        open::that(url).unwrap();
+        while !check_token(token.clone()) {
+            token = get_input("Type your 'access_token' from opened browser page:");
+        };
+        data["token"] = json!(token);
+        save_json(&data)
+    };
+    token
+}
+
+fn get_client_id() -> String {
+    let (mut data, mut client_id) = get_data_with_value("client_id");
+    if client_id == "" {
+		client_id = get_input("Type your 'client_id':");
+        data["client_id"] = json!(client_id);
+        save_json(&data);
+	};
+    client_id
+}
+
+fn save_json(data: &Value) {
+    let f = OpenOptions::new().write(true).open(LOGIN_FILE).unwrap();
+    let w = BufWriter::new(f);
+    let _t = to_writer_pretty(w, data).unwrap();
+}
+
 // JSON reader, that also creates a file with the same name if it doesn't exist.
-fn get_json_data(filename: &Path) -> Value {
+fn get_json_data(filenames: &str) -> Value {
+    let filename = Path::new(filenames);
     if !filename.exists() {
         let file = OpenOptions::new()
             .write(true)
@@ -31,7 +86,7 @@ fn get_json_data(filename: &Path) -> Value {
             .open(filename)
             .unwrap();
         let w = BufWriter::new(file);
-        let t = to_writer_pretty(w, &json!({
+        let _t = to_writer_pretty(w, &json!({
             "token" : "",
             "client_id" : ""
         })).unwrap();
@@ -45,35 +100,12 @@ fn get_json_data(filename: &Path) -> Value {
 }
 
 fn main() {
-    let path_of_login = Path::new("login.json");
-    let mut data = get_json_data(path_of_login);
-
     // Getting client_id's input.
-    let mut client_id = data["client_id"].as_str().unwrap().to_string();
-    if client_id == "" {
-		client_id = get_input("Type your 'client_id':");
-        data["client_id"] = json!(client_id);
-        let f = OpenOptions::new().write(true).open("login.json").unwrap();
-        let w = BufWriter::new(f);
-        to_writer_pretty(w, &data).unwrap();
-	};
-
-    // VK API version.  
-    let api_version: String = "5.92".to_string();
+    let client_id = get_client_id();
 
     // Getting token's input.
-    let mut token = data["token"].as_str().unwrap().to_string();
-    if token == "" {
-        let url = format!("https://oauth.vk.com/authorize?client_id={}&display=page&redirect_uri=https://oauth.vk.com/blank.html/callback&scope=friends&response_type=token&v={}",
-        client_id, api_version);  
-        open::that(url).unwrap();
-        token = get_input("Type your 'access_token' from opened browser page:");
-        data["token"] = json!(token);
-        let f = OpenOptions::new().write(true).open("login.json").unwrap();
-        let w = BufWriter::new(f);
-        to_writer_pretty(w, &data).unwrap();
-    };
-
+    let token = get_token(client_id);
+    
     // Create an API Client.
     let api = APIClient::new(token);
     
