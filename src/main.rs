@@ -51,7 +51,7 @@ fn main() {
     // Getting client_id's input.
     let mut client_id = data["client_id"].as_str().unwrap().to_string();
     if client_id == "" {
-		client_id = get_input("Введите свой client_id:");
+		client_id = get_input("Type your 'client_id':");
         data["client_id"] = json!(client_id);
         let f = OpenOptions::new().write(true).open("login.json").unwrap();
         let w = BufWriter::new(f);
@@ -67,7 +67,7 @@ fn main() {
         let url = format!("https://oauth.vk.com/authorize?client_id={}&display=page&redirect_uri=https://oauth.vk.com/blank.html/callback&scope=friends&response_type=token&v={}",
         client_id, api_version);  
         open::that(url).unwrap();
-        token = get_input("Введите полученный access_token из открывшейся страницы:");
+        token = get_input("Type your 'access_token' from opened browser page:");
         data["token"] = json!(token);
         let f = OpenOptions::new().write(true).open("login.json").unwrap();
         let w = BufWriter::new(f);
@@ -79,31 +79,28 @@ fn main() {
     
     // Create a HashMap to store parameters.
     let mut count_offset = 0;
-    let inc_offset = 10; // Default is 0, Max is 1000.
-
-    // URL on get_members VK API: https://vk.com/dev/groups.getMembers
+    let inc_offset = 1; // Default is 0, Max is 1000.
     let mut params_groups: Params = from_value(json!(
         {
             "group_id" : "61440523",
             "count" : "1",
-            "offset" : "1",
+            "offset" : "0", // Don't change.
             "fields" : "sex, city, bdate"
         }
     )).unwrap();
 
-    println!("\nПередаём следующие данные: {:?}\n", params_groups);
-    
+    println!("\nWe transfer the following data: {:?}\n", params_groups);
+
     let mut stop = "1".to_string(); // "While"'s exit.
-    while stop.trim() == "1" {
+    while stop == "1" {
+        // URL on get_members VK API: https://vk.com/dev/groups.getMembers
         let members = groups::get_members(&api, params_groups.clone());
         match members {
             Ok(v) => {
                 let json_data: Value = from_value(v).unwrap();
-                //println!("{:?}\n", json_data);
-                //let slice = json_data["items"].clone();
-                //println!("{:?}\n", slice);
-                //let users: Vec<User> = from_value(slice).unwrap();
-                //println!("{:?}\n", users);
+                let count: i32 = from_value(json_data["count"].clone()).unwrap();
+                let current_count: i32 = count - count_offset;
+                println!("Number of users: {}\n", current_count);
 
                 let f = OpenOptions::new()
                 .write(true)
@@ -112,15 +109,14 @@ fn main() {
                 .unwrap();
                 let w = BufWriter::new(f);
                 to_writer_pretty(w, &json_data).unwrap();
-                
             }
             Err(e) => println!("{}", e)
         };
         count_offset += inc_offset;
         params_groups.insert("offset".into(), count_offset.to_string().into());
         
-        // ограничение, для завершения цикла, так же нужна задержка, если убрать эту заслонку, дабы не забанили ор) от ддос атаки запросами
-        stop = get_input("Для продолжения введите 1:"); 
+        // To exit from "While" or continue.
+        stop = get_input("To continue type 1:"); 
         println!("stop = {}", stop);
     };
 }
