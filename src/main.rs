@@ -3,6 +3,7 @@
 extern crate rvk;
 extern crate serde_json;
 extern crate open;
+extern crate rusqlite;
 
 use std::io;
 use std::fs::OpenOptions;
@@ -11,12 +12,43 @@ use serde_json::{json, to_writer_pretty, from_value, Value, from_reader};
 use std::path::Path;
 use std::io::BufReader;
 use std::io::BufWriter;
+use rvk::API_VERSION;
+use rusqlite::{Connection, NO_PARAMS};
 
 // File config for auth
 const LOGIN_FILE : &str = "login.json";
 
-// VK API Version
-const API_VERSION : &str = "5.92";
+// Simple Database
+struct DB {
+    db : Connection
+}
+
+impl DB {
+    // constructor
+    fn new(file : &str) -> DB {
+        let mut d = Connection::open(file).unwrap();
+        d.execute("create table if not exists u (i unsigned integer)", NO_PARAMS).unwrap();
+        DB {db : d}
+    }
+
+    // checks value in database
+    fn contains(&self, i : u32) -> bool {
+        let r : u32 = self.db.query_row("select count(i) from u where i=?1", &[&i], |r| r.get(0)).unwrap();
+        r > 0
+    }
+
+    // adding value to database
+    fn add(&self, i : u32) {
+        if !self.contains(i) {
+            self.db.execute("insert into u values (?1)", &[&i]).unwrap();
+        }
+    }
+
+    // returns length of values
+    fn len(&self) -> u32 {
+        self.db.query_row("select count(i) from u", NO_PARAMS, |r| r.get(0)).unwrap()
+    }
+}
 
 // Easy input function.
 fn get_input<T>(text: T) -> String 
@@ -100,6 +132,9 @@ fn get_json_data(filenames: &str) -> Value {
 }
 
 fn main() {
+    // first database
+    let mut d = DB::new("add.db");
+    
     // Getting client_id's input.
     let client_id = get_client_id();
 
