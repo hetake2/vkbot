@@ -13,7 +13,7 @@ use std::path::Path;
 use std::io::BufReader;
 use std::io::BufWriter;
 use rvk::API_VERSION;
-use rusqlite::{Connection, NO_PARAMS};
+use rusqlite::{Connection, NO_PARAMS, MappedRows, Statement, Rows, Row};
 
 // File config for auth
 const LOGIN_FILE : &str = "login.json";
@@ -47,6 +47,17 @@ impl DB {
     // returns length of values
     fn len(&self) -> u32 {
         self.db.query_row("select count(i) from u", NO_PARAMS, |r| r.get(0)).unwrap()
+    }
+    
+    fn print(&self) {
+        if self.len() > 0 {
+            let mut t = self.db.prepare("select i from u").unwrap();
+            for i in t.query_map(NO_PARAMS, |r| -> u32 { r.get(0) } ).unwrap() {
+                println!("id {}", i.unwrap());
+            }
+        } else {
+            println!("Nothing");
+        }
     }
 }
 
@@ -134,6 +145,7 @@ fn get_json_data(filenames: &str) -> Value {
 fn main() {
     // first database
     let mut d = DB::new("add.db");
+    d.print();
     
     // Getting client_id's input.
     let client_id = get_client_id();
