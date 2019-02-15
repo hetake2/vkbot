@@ -184,7 +184,7 @@ fn main() {
             Ok(v) => {
                 let json_data: Value = from_value(v).unwrap();
                 let count: u32 = from_value(json_data["count"].clone()).unwrap();
-                println!("Parse left: {}\n", count);
+                println!("Parse left: {}\n", count - offset);
                 let items = json_data["items"].clone();
                 for i in 0..1000 {
                     let user = items[i].clone();
