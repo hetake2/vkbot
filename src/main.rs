@@ -4,16 +4,18 @@ extern crate rvk;
 extern crate serde_json;
 extern crate open;
 extern crate rusqlite;
+extern crate chrono;
 
 use std::io;
 use std::fs::OpenOptions;
-use rvk::{methods::groups, APIClient, Params, objects::user::User};
+use rvk::{methods::groups, APIClient, Params};
 use serde_json::{json, to_writer_pretty, from_value, Value, from_reader};
 use std::path::Path;
 use std::io::BufReader;
 use std::io::BufWriter;
 use rvk::API_VERSION;
-use rusqlite::{Connection, NO_PARAMS, MappedRows, Statement, Rows, Row};
+use rusqlite::{Connection, NO_PARAMS};
+use chrono::{NaiveDate, Utc};
 
 // File config for auth
 const LOGIN_FILE : &str = "login.json";
@@ -147,6 +149,9 @@ fn main() {
     // first database
     let mut d = DB::new("add.db");
     
+    // current date
+    let current_date : NaiveDate = Utc::today().naive_utc();
+
     // Getting client_id's input.
     let client_id = get_client_id();
 
@@ -157,8 +162,6 @@ fn main() {
     let api = APIClient::new(token);
     
     // Create a HashMap to store parameters.
-    let mut count_offset = 0;
-    let inc_offset = 1; // Default is 0, Max is 1000.
     let mut params_groups: Params = from_value(json!(
         {
             "group_id" : "61440523",
@@ -171,36 +174,38 @@ fn main() {
     println!("\nWe transfer the following data: {:?}\n", params_groups);
 
     let mut stop = "1".to_string(); // "While"'s exit.
-    while stop == "1" {
+    let mut offset = 0;
+    let mut count = 0;
+    let count_inc = 1000;
+    while stop == "1" && (count == 0 || offset < count) {
         // URL on get_members VK API: https://vk.com/dev/groups.getMembers
         let members = groups::get_members(&api, params_groups.clone());
         match members {
             Ok(v) => {
                 let json_data: Value = from_value(v).unwrap();
-                let count: i32 = from_value(json_data["count"].clone()).unwrap();
-                let current_count: i32 = count - count_offset;
-                println!("Number of users: {}\n", current_count);
+                let count: u32 = from_value(json_data["count"].clone()).unwrap();
+                println!("Parse left: {}\n", count - offset);
                 let items = json_data["items"].clone();
-                for i in 0..100 {
+                for i in 0..1000 {
                     let user = items[i].clone();
                     let date = user["bdate"].as_str().unwrap_or("").to_string();
                     if user["sex"].as_u64().unwrap_or(0) == 1 &&
                     user["city"]["id"].as_u64().unwrap_or(0) == 1 {
-                        println!("{} {}", user["first_name"].as_str().unwrap(), user["last_name"].as_str().unwrap());
+                        let date = NaiveDate::parse_from_str(&date, "%d.%m.%Y");
+                        match date {
+                            Ok(v) => {
+                                let result = (current_date - v).num_days() / 365;
+                                println!("{} {} ей {} лет", user["first_name"].as_str().unwrap(), user["last_name"].as_str().unwrap(), result);
+                            },
+                            Err(e) => std::thread::sleep(std::time::Duration::from_secs(0))
+                        };
                     };
                 };
-                let f = OpenOptions::new()
-                .write(true)
-                .create(true)
-                .open("accounts.json")
-                .unwrap();
-                let w = BufWriter::new(f);
-                to_writer_pretty(w, &json_data).unwrap();
             }
             Err(e) => println!("{}", e)
         };
-        count_offset += inc_offset;
-        params_groups.insert("offset".into(), count_offset.to_string().into());
+        offset += count_inc;
+        params_groups.insert("offset".into(), offset.to_string().into());
         
         // To exit from "While" or continue.
         stop = get_input("To continue type 1:"); 
