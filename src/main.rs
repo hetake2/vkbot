@@ -7,7 +7,7 @@ extern crate rusqlite;
 
 use std::io;
 use std::fs::OpenOptions;
-use rvk::{methods::groups, APIClient, Params};
+use rvk::{methods::groups, APIClient, Params, objects::user::User};
 use serde_json::{json, to_writer_pretty, from_value, Value, from_reader};
 use std::path::Path;
 use std::io::BufReader;
@@ -24,6 +24,7 @@ struct DB {
 }
 
 impl DB {
+
     // constructor
     fn new(file : &str) -> DB {
         let mut d = Connection::open(file).unwrap();
@@ -145,7 +146,6 @@ fn get_json_data(filenames: &str) -> Value {
 fn main() {
     // first database
     let mut d = DB::new("add.db");
-    d.print();
     
     // Getting client_id's input.
     let client_id = get_client_id();
@@ -162,7 +162,7 @@ fn main() {
     let mut params_groups: Params = from_value(json!(
         {
             "group_id" : "61440523",
-            "count" : "1",
+            "count" : "1000",
             "offset" : "0", // Don't change.
             "fields" : "sex, city, bdate"
         }
@@ -180,7 +180,15 @@ fn main() {
                 let count: i32 = from_value(json_data["count"].clone()).unwrap();
                 let current_count: i32 = count - count_offset;
                 println!("Number of users: {}\n", current_count);
-
+                let items = json_data["items"].clone();
+                for i in 0..100 {
+                    let user = items[i].clone();
+                    let date = user["bdate"].as_str().unwrap_or("").to_string();
+                    if user["sex"].as_u64().unwrap_or(0) == 1 &&
+                    user["city"]["id"].as_u64().unwrap_or(0) == 1 {
+                        println!("{} {}", user["first_name"].as_str().unwrap(), user["last_name"].as_str().unwrap());
+                    };
+                };
                 let f = OpenOptions::new()
                 .write(true)
                 .create(true)
