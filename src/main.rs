@@ -7,13 +7,13 @@ extern crate rusqlite;
 
 use std::io;
 use std::fs::OpenOptions;
-use rvk::{methods::groups, APIClient, Params};
+use rvk::{methods::groups, APIClient, Params, objects::user::User};
 use serde_json::{json, to_writer_pretty, from_value, Value, from_reader};
 use std::path::Path;
 use std::io::BufReader;
 use std::io::BufWriter;
 use rvk::API_VERSION;
-use rusqlite::{Connection, NO_PARAMS};
+use rusqlite::{Connection, NO_PARAMS, MappedRows, Statement, Rows, Row};
 
 // File config for auth
 const LOGIN_FILE : &str = "login.json";
@@ -24,6 +24,7 @@ struct DB {
 }
 
 impl DB {
+
     // constructor
     fn new(file : &str) -> DB {
         let mut d = Connection::open(file).unwrap();
@@ -47,6 +48,17 @@ impl DB {
     // returns length of values
     fn len(&self) -> u32 {
         self.db.query_row("select count(i) from u", NO_PARAMS, |r| r.get(0)).unwrap()
+    }
+    
+    fn print(&self) {
+        if self.len() > 0 {
+            let mut t = self.db.prepare("select i from u").unwrap();
+            for i in t.query_map(NO_PARAMS, |r| -> u32 { r.get(0) } ).unwrap() {
+                println!("id {}", i.unwrap());
+            }
+        } else {
+            println!("Nothing");
+        }
     }
 }
 
@@ -150,7 +162,7 @@ fn main() {
     let mut params_groups: Params = from_value(json!(
         {
             "group_id" : "61440523",
-            "count" : "1",
+            "count" : "1000",
             "offset" : "0", // Don't change.
             "fields" : "sex, city, bdate"
         }
@@ -168,7 +180,15 @@ fn main() {
                 let count: i32 = from_value(json_data["count"].clone()).unwrap();
                 let current_count: i32 = count - count_offset;
                 println!("Number of users: {}\n", current_count);
-
+                let items = json_data["items"].clone();
+                for i in 0..100 {
+                    let user = items[i].clone();
+                    let date = user["bdate"].as_str().unwrap_or("").to_string();
+                    if user["sex"].as_u64().unwrap_or(0) == 1 &&
+                    user["city"]["id"].as_u64().unwrap_or(0) == 1 {
+                        println!("{} {}", user["first_name"].as_str().unwrap(), user["last_name"].as_str().unwrap());
+                    };
+                };
                 let f = OpenOptions::new()
                 .write(true)
                 .create(true)
