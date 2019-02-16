@@ -1,72 +1,105 @@
 //#![allow(dead_code, unused_imports)]
 
-extern crate rvk;
-extern crate serde_json;
+extern crate chrono;
 extern crate open;
 extern crate rusqlite;
-extern crate chrono;
+extern crate rvk;
+extern crate serde_json;
 
-use std::io;
-use std::fs::OpenOptions;
+use chrono::{NaiveDate, Utc};
+use rusqlite::{Connection, NO_PARAMS};
+use rvk::API_VERSION;
 use rvk::{methods::groups, APIClient, Params};
-use serde_json::{json, to_writer_pretty, from_value, Value, from_reader};
-use std::path::Path;
+use serde_json::{from_reader, from_value, json, to_writer_pretty, Value};
+use std::fs::OpenOptions;
+use std::io;
 use std::io::BufReader;
 use std::io::BufWriter;
-use rvk::API_VERSION;
-use rusqlite::{Connection, NO_PARAMS};
-use chrono::{NaiveDate, Utc};
+use std::path::Path;
 
-// File config for auth
-const LOGIN_FILE : &str = "login.json";
+// File config for auth.
+const LOGIN_FILE: &str = "login.json";
 
-// Simple Database
+// Simple Database.
 struct DB {
-    db : Connection
+    db: Connection,
 }
 
 impl DB {
-
-    // constructor
-    fn new(file : &str) -> DB {
+    // Constructor.
+    fn new(file: &str) -> DB {
         let mut d = Connection::open(file).unwrap();
-        d.execute("create table if not exists u (i unsigned integer)", NO_PARAMS).unwrap();
-        DB {db : d}
+        d.execute(
+            "create table if not exists u (i unsigned integer)",
+            NO_PARAMS,
+        )
+        .unwrap();
+        DB { db: d }
     }
 
-    // checks value in database
-    fn contains(&self, i : u32) -> bool {
-        let r : u32 = self.db.query_row("select count(i) from u where i=?1", &[&i], |r| r.get(0)).unwrap();
+    // Checks value in database.
+    fn contains(&self, i: u32) -> bool {
+        let r: u32 = self
+            .db
+            .query_row("select count(i) from u where i=?1", &[&i], |r| r.get(0))
+            .unwrap();
         r > 0
     }
 
-    // adding value to database
-    fn add(&self, i : u32) {
+    // Adding value to database.
+    fn add(&self, i: u32) {
         if !self.contains(i) {
             self.db.execute("insert into u values (?1)", &[&i]).unwrap();
         }
     }
 
-    // returns length of values
+    // Returns length of values.
     fn len(&self) -> u32 {
-        self.db.query_row("select count(i) from u", NO_PARAMS, |r| r.get(0)).unwrap()
+        self.db
+            .query_row("select count(i) from u", NO_PARAMS, |r| r.get(0))
+            .unwrap()
     }
-    
+
+    fn get_vec(&self) -> Vec<u32> {
+        let mut result: Vec<u32> = Vec::new();
+        let mut t = self.db.prepare("select i from u").unwrap();
+        for i in t.query_map(NO_PARAMS, |r| -> u32 { r.get(0) }).unwrap() {
+            result.push(i.unwrap());
+        }
+        result
+    }
+
     fn print(&self) {
         if self.len() > 0 {
-            let mut t = self.db.prepare("select i from u").unwrap();
-            for i in t.query_map(NO_PARAMS, |r| -> u32 { r.get(0) } ).unwrap() {
-                println!("id {}", i.unwrap());
+            for i in self.get_vec() {
+                println!("id {}", i);
             }
         } else {
             println!("Nothing");
         }
     }
+
+    fn delete(&self, i: u32) {
+        if self.contains(i) {
+            self.db.execute("delete from u where i=?1", &[&i]).unwrap();
+        }
+    }
+
+    fn clean(&self) {
+        if self.len() > 0 {
+            for i in self.get_vec() {
+                self.delete(i)
+            }
+        } else {
+            println!("Is clean!!!")
+        }
+    }
 }
 
 // Easy input function.
-fn get_input<T>(text: T) -> String 
-    where T: ToString
+fn get_input<T>(text: T) -> String
+where
+    T: ToString,
 {
     println!("{}", text.to_string());
     let mut buf = String::new();
@@ -74,14 +107,18 @@ fn get_input<T>(text: T) -> String
     buf.trim().to_string()
 }
 
-fn check_token(token : String) -> bool {
+fn check_token(token: String) -> bool {
     let api = APIClient::new(token);
-    let result = groups::get_members(&api, from_value(json!({
-        "group_id" : "61440523"
-    })).unwrap());
+    let result = groups::get_members(
+        &api,
+        from_value(json!({
+            "group_id" : "61440523"
+        }))
+        .unwrap(),
+    );
     match result {
-        Ok(_v) => { return true }
-        Err(_e) => { return false}
+        Ok(_v) => return true,
+        Err(_e) => return false,
     };
 }
 
@@ -99,7 +136,7 @@ fn get_token(client_id: String) -> String {
         open::that(url).unwrap();
         while !check_token(token.clone()) {
             token = get_input("Type your 'access_token' from opened browser page:");
-        };
+        }
         data["token"] = json!(token);
         save_json(&data)
     };
@@ -109,10 +146,10 @@ fn get_token(client_id: String) -> String {
 fn get_client_id() -> String {
     let (mut data, mut client_id) = get_data_with_value("client_id");
     if client_id == "" {
-		client_id = get_input("Type your 'client_id':");
+        client_id = get_input("Type your 'client_id':");
         data["client_id"] = json!(client_id);
         save_json(&data);
-	};
+    };
     client_id
 }
 
@@ -132,35 +169,36 @@ fn get_json_data(filenames: &str) -> Value {
             .open(filename)
             .unwrap();
         let w = BufWriter::new(file);
-        let _t = to_writer_pretty(w, &json!({
-            "token" : "",
-            "client_id" : ""
-        })).unwrap();
-    };
-    let file = OpenOptions::new()
-        .read(true)
-        .open(filename)
+        let _t = to_writer_pretty(
+            w,
+            &json!({
+                "token" : "",
+                "client_id" : ""
+            }),
+        )
         .unwrap();
+    };
+    let file = OpenOptions::new().read(true).open(filename).unwrap();
     let reader = BufReader::new(file);
     from_reader(reader).unwrap()
 }
 
 fn main() {
-    // first database
+    // First database.
     let mut d = DB::new("add.db");
-    
-    // current date
-    let current_date : NaiveDate = Utc::today().naive_utc();
+
+    // Current date.
+    let current_date: NaiveDate = Utc::today().naive_utc();
 
     // Getting client_id's input.
     let client_id = get_client_id();
 
     // Getting token's input.
     let token = get_token(client_id);
-    
+
     // Create an API Client.
     let api = APIClient::new(token);
-    
+
     // Create a HashMap to store parameters.
     let mut params_groups: Params = from_value(json!(
         {
@@ -169,9 +207,10 @@ fn main() {
             "offset" : "0", // Don't change.
             "fields" : "sex, city, bdate"
         }
-    )).unwrap();
+    ))
+    .unwrap();
 
-    println!("\nWe transfer the following data: {:?}\n", params_groups);
+    println!("\nWe transfer the following data: {:?}", params_groups);
 
     let mut stop = "1".to_string(); // "While"'s exit.
     let mut offset = 0;
@@ -182,33 +221,51 @@ fn main() {
         let members = groups::get_members(&api, params_groups.clone());
         match members {
             Ok(v) => {
+                // Our JSON data with array (items) of users.
                 let json_data: Value = from_value(v).unwrap();
-                let count: u32 = from_value(json_data["count"].clone()).unwrap();
-                println!("Parse left: {}\n", count - offset);
+                count = from_value(json_data["count"].clone()).unwrap();
+                println!("\nParse left: {}\n", count - offset);
+
+                // Our filter to get certain ids.
                 let items = json_data["items"].clone();
                 for i in 0..1000 {
                     let user = items[i].clone();
+                    // Getting user's birthday.
                     let date = user["bdate"].as_str().unwrap_or("").to_string();
-                    if user["sex"].as_u64().unwrap_or(0) == 1 &&
-                    user["city"]["id"].as_u64().unwrap_or(0) == 1 {
+                    // Getting user's sex and location.
+                    if user["sex"].as_u64().unwrap_or(0) == 1
+                        && user["city"]["id"].as_u64().unwrap_or(0) == 1
+                    {
                         let date = NaiveDate::parse_from_str(&date, "%d.%m.%Y");
                         match date {
                             Ok(v) => {
                                 let result = (current_date - v).num_days() / 365;
-                                println!("{} {} ей {} лет", user["first_name"].as_str().unwrap(), user["last_name"].as_str().unwrap(), result);
-                            },
-                            Err(e) => std::thread::sleep(std::time::Duration::from_secs(0))
+                                if result > 16 && result < 26 {
+                                    println!(
+                                        "{} {}, {} years old;",
+                                        user["first_name"].as_str().unwrap(),
+                                        user["last_name"].as_str().unwrap(),
+                                        result
+                                    );
+                                    d.add(from_value(user["id"].clone()).unwrap())
+                                }
+                            }
+                            Err(_) => {}
                         };
                     };
-                };
+                }
             }
-            Err(e) => println!("{}", e)
+            Err(e) => println!("{}", e),
         };
         offset += count_inc;
+        if offset > count {
+            break;
+        }
         params_groups.insert("offset".into(), offset.to_string().into());
-        
+
         // To exit from "While" or continue.
-        stop = get_input("To continue type 1:"); 
+        stop = get_input("\nTo continue type 1:");
         println!("stop = {}", stop);
-    };
+    }
+    println!("\nTotal users in DataBase: {}", d.len())
 }
