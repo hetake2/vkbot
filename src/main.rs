@@ -9,7 +9,7 @@ extern crate serde_json;
 use chrono::{NaiveDate, Utc};
 use rusqlite::{Connection, NO_PARAMS};
 use rvk::API_VERSION;
-use rvk::{methods::groups, APIClient, Params};
+use rvk::{methods::friends::add, methods::groups::get_members, APIClient, Params};
 use serde_json::{from_reader, from_value, json, to_writer_pretty, Value};
 use std::fs::OpenOptions;
 use std::io;
@@ -60,6 +60,7 @@ impl DB {
             .unwrap()
     }
 
+    // Returns an array with indexes from database.
     fn get_vec(&self) -> Vec<u32> {
         let mut result: Vec<u32> = Vec::new();
         let mut t = self.db.prepare("select i from u").unwrap();
@@ -109,7 +110,7 @@ where
 
 fn check_token(token: String) -> bool {
     let api = APIClient::new(token);
-    let result = groups::get_members(
+    let result = get_members(
         &api,
         from_value(json!({
             "group_id" : "61440523"
@@ -218,7 +219,7 @@ fn main() {
     let count_inc = 1000;
     while stop == "1" && (count == 0 || offset < count) {
         // URL on get_members VK API: https://vk.com/dev/groups.getMembers
-        let members = groups::get_members(&api, params_groups.clone());
+        let members = get_members(&api, params_groups.clone());
         match members {
             Ok(v) => {
                 // Our JSON data with array (items) of users.
@@ -267,5 +268,20 @@ fn main() {
         stop = get_input("\nTo continue type 1:");
         println!("stop = {}", stop);
     }
-    println!("\nTotal users in DataBase: {}", d.len())
+    println!("\nTotal users in DataBase: {}\n", d.len());
+
+    match get_input("Start send requests? 1 for Yes.").as_ref() {
+        "1" => {
+            let user_id = "413405639";
+            let text = "Привет)";
+            let params: Params = from_value(json!(
+            {
+                "user_id" : user_id,
+                "text" : text,
+            }))
+            .unwrap();
+            add(&api, params).unwrap();
+        }
+        _ => {}
+    };
 }
