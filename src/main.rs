@@ -9,7 +9,10 @@ extern crate serde_json;
 use chrono::{NaiveDate, Utc};
 use rusqlite::{Connection, NO_PARAMS};
 use rvk::API_VERSION;
-use rvk::{methods::friends::add, methods::groups::get_members, APIClient, Params};
+use rvk::{
+    methods::{friends::add, friends::are_friends, groups::get_members},
+    APIClient, Params,
+};
 use serde_json::{from_reader, from_value, json, to_writer_pretty, Value};
 use std::fs::OpenOptions;
 use std::io;
@@ -206,7 +209,7 @@ fn main() {
             "group_id" : "61440523",
             "count" : "1000",
             "offset" : "0", // Don't change.
-            "fields" : "sex, city, bdate"
+            "fields" : "sex, city, bdate, can_send_friend_request"
         }
     ))
     .unwrap();
@@ -236,6 +239,7 @@ fn main() {
                     // Getting user's sex and location.
                     if user["sex"].as_u64().unwrap_or(0) == 1
                         && user["city"]["id"].as_u64().unwrap_or(0) == 1
+                        && user["can_send_friend_request"].as_u64().unwrap_or(0) == 1
                     {
                         let date = NaiveDate::parse_from_str(&date, "%d.%m.%Y");
                         match date {
@@ -272,15 +276,37 @@ fn main() {
 
     match get_input("Start send requests? 1 for Yes.").as_ref() {
         "1" => {
-            let user_id = "413405639";
-            let text = "Привет)";
-            let params: Params = from_value(json!(
-            {
-                "user_id" : user_id,
-                "text" : text,
-            }))
-            .unwrap();
-            add(&api, params).unwrap();
+            for i in d.get_vec() {
+                let user_id = i;
+                let are_friends_params: Params = from_value(json!(
+                {
+                    "user_ids" : user_id.to_string(),
+                    "need_sign" : "1",
+                }))
+                .unwrap();
+                let response = are_friends(&api, are_friends_params);
+                match response {
+                    Ok(v) => {
+                        let json_data: Value = from_value(v).unwrap();
+                        let resp = json_data["response"].clone();
+                        let friend_status = resp["friend_status"].clone();
+                        if friend_status.as_u64().unwrap_or(5) != 1
+                            || friend_status.as_u64().unwrap_or(5) != 3
+                            || friend_status.as_u64().unwrap_or(5) != 2
+                        {
+                            let text = "";
+                            let params: Params = from_value(json!(
+                            {
+                                "user_id" : user_id.to_string(),
+                                "text" : text,
+                            }))
+                            .unwrap();
+                            add(&api, params).unwrap();
+                        }
+                    }
+                    Err(e) => {}
+                }
+            }
         }
         _ => {}
     };
