@@ -19,6 +19,8 @@ use std::io;
 use std::io::BufReader;
 use std::io::BufWriter;
 use std::path::Path;
+use std::thread::sleep;
+use std::time::Duration;
 
 // File config for auth.
 const LOGIN_FILE: &str = "login.json";
@@ -301,7 +303,18 @@ fn main() {
                                 "text" : text,
                             }))
                             .unwrap();
-                            add(&api, params).unwrap();
+                            let mut completed = false;
+                            while !completed {
+                                match add(&api, params.clone()) {
+                                    Ok(_) => completed = true,
+                                    Err(_) => {
+                                        println!(
+                                            "Ждем когда каптча закончится"
+                                        );
+                                        sleep(Duration::from_secs(300));
+                                    }
+                                }
+                            }
                         }
                     }
                     Err(e) => {}
