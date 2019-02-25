@@ -8,12 +8,13 @@ extern crate serde_json;
 
 use chrono::{NaiveDate, Utc};
 use rusqlite::{Connection, NO_PARAMS};
-use rvk::API_VERSION;
 use rvk::{
+    error::APIError,
+    error::Error::API,
     methods::{friends::add, friends::are_friends, groups::get_members},
-    APIClient, Params,
+    APIClient, Params, API_VERSION,
 };
-use serde_json::{from_reader, from_value, json, to_writer_pretty, Value};
+use serde_json::{from_reader, from_value, json, to_string_pretty, to_writer_pretty, Value};
 use std::fs::OpenOptions;
 use std::io;
 use std::io::BufReader;
@@ -209,6 +210,7 @@ fn main() {
     let mut params_groups: Params = from_value(json!(
         {
             "group_id" : "61440523",
+            "sort" : "id_desc",
             "count" : "1000",
             "offset" : "0", // Don't change.
             "fields" : "sex, city, bdate, can_send_friend_request"
@@ -296,8 +298,8 @@ fn main() {
                             || friend_status.as_u64().unwrap_or(5) != 3
                             || friend_status.as_u64().unwrap_or(5) != 2
                         {
-                            let text = "";
-                            let params: Params = from_value(json!(
+                            let text = "Привет)";
+                            let mut params: Params = from_value(json!(
                             {
                                 "user_id" : user_id.to_string(),
                                 "text" : text,
@@ -305,15 +307,47 @@ fn main() {
                             .unwrap();
                             let mut completed = false;
                             while !completed {
+                                println!("\n{:?}", params);
                                 match add(&api, params.clone()) {
                                     Ok(_) => completed = true,
-                                    Err(_) => {
-                                        println!(
-                                            "Ждем когда каптча закончится"
-                                        );
-                                        sleep(Duration::from_secs(300));
-                                    }
+                                    Err(e) => match e {
+                                        API(e) => match e.code() {
+                                            14 => {
+                                                let json_data = e.extra();
+                                                let captcha_sid: String =
+                                                    from_value(json_data["captcha_sid"].clone())
+                                                        .unwrap();
+                                                let captcha_img: String =
+                                                    from_value(json_data["captcha_img"].clone())
+                                                        .unwrap();
+                                                println!("{}\n", captcha_img);
+                                                open::that(captcha_img).unwrap();
+                                                let captcha_key =
+                                                    get_input("\nWaiting for captcha...");
+                                                println!(
+                                                    "sid = {}, key = {}",
+                                                    captcha_sid, captcha_key
+                                                );
+                                                params.insert(
+                                                    "captcha_sid".into(),
+                                                    captcha_sid.into(),
+                                                );
+                                                params.insert(
+                                                    "captcha_key".into(),
+                                                    captcha_key.into(),
+                                                );
+
+                                                sleep(Duration::from_secs(5));
+                                            }
+                                            _ => println!(
+                                                "{:?}",
+                                                to_string_pretty(&json!(e.extra()))
+                                            ),
+                                        },
+                                        _ => {}
+                                    },
                                 }
+                                //sleep(Duration::from_secs(300));
                             }
                         }
                     }
