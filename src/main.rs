@@ -12,11 +12,9 @@ use lib::*;
 use rvk::{
     error::Error::API,
     methods::{friends::add, friends::are_friends, groups::get_members},
-    APIClient, Params,
+    Params,
 };
-use serde_json::{from_value, json, to_string_pretty, Value};
-use std::thread::sleep;
-use std::time::Duration;
+use serde_json::{from_value, json, Value};
 
 fn main() {
     // First database.
@@ -25,14 +23,8 @@ fn main() {
     // Current date.
     let current_date: NaiveDate = Utc::today().naive_utc();
 
-    // Getting client_id's input.
-    let client_id = get_client_id();
-
-    // Getting token's input.
-    let token = get_token(client_id);
-
     // Create an API Client.
-    let api = APIClient::new(token);
+    let api = get_api();
 
     // Create a HashMap to store parameters.
     let mut params_groups: Params = from_value(json!(
@@ -69,9 +61,9 @@ fn main() {
                     // Getting user's birthday.
                     let date = user["bdate"].as_str().unwrap_or("").to_string();
                     // Getting user's sex and location.
-                    if user["sex"].as_u64().unwrap_or(0) == 1
-                        && user["city"]["id"].as_u64().unwrap_or(0) == 1
-                        && user["can_send_friend_request"].as_u64().unwrap_or(0) == 1
+                    if from_value(user["sex"].clone()).unwrap_or(0) == 1
+                        && from_value(user["city"]["id"].clone()).unwrap_or(0) == 1
+                        && from_value(user["can_send_friend_request"].clone()).unwrap_or(0) == 1
                     {
                         let date = NaiveDate::parse_from_str(&date, "%d.%m.%Y");
                         match date {
@@ -122,10 +114,7 @@ fn main() {
                         let json_data: Value = from_value(v).unwrap();
                         let resp = json_data["response"].clone();
                         let friend_status = resp["friend_status"].clone();
-                        if friend_status.as_u64().unwrap_or(5) != 1
-                            || friend_status.as_u64().unwrap_or(5) != 3
-                            || friend_status.as_u64().unwrap_or(5) != 2
-                        {
+                        if !vec![1, 2, 3].contains(&from_value(friend_status).unwrap()) {
                             let text = "Привет)";
                             let mut params: Params = from_value(json!(
                             {
@@ -138,57 +127,16 @@ fn main() {
                                 println!("\n{:?}", params);
                                 match add(&api, params.clone()) {
                                     Ok(_) => completed = true,
-                                    Err(e) => match e {
-                                        API(e) => match e.code() {
-                                            14 => {
-                                                let json_data = e.extra();
-                                                let captcha_sid: String =
-                                                    from_value(json_data["captcha_sid"].clone())
-                                                        .unwrap();
-                                                let captcha_img: String =
-                                                    from_value(json_data["captcha_img"].clone())
-                                                        .unwrap();
-                                                println!("{}\n", captcha_img);
-                                                open::that(captcha_img).unwrap();
-                                                let captcha_key =
-                                                    get_input("\nWaiting for captcha...");
-                                                println!(
-                                                    "sid = {}, key = {}",
-                                                    captcha_sid, captcha_key
-                                                );
-                                                params.insert(
-                                                    "captcha_sid".into(),
-                                                    captcha_sid.into(),
-                                                );
-                                                params.insert(
-                                                    "captcha_key".into(),
-                                                    captcha_key.into(),
-                                                );
-
-                                                sleep(Duration::from_secs(5));
-                                            }
-                                            6 => {
-                                                println!(
-                                                    "Превышение запросов за 1 секунду"
-                                                );
-                                                sleep(Duration::from_secs(1))
-                                            }
-                                            _ => println!(
-                                                "{:?}",
-                                                to_string_pretty(&json!(e.extra()))
-                                            ),
-                                        },
-                                        _ => {}
-                                    },
+                                    Err(API(e)) => error_handler(e, &mut params),
+                                    _ => {}
                                 }
-                                //sleep(Duration::from_secs(300));
                             }
                         }
                     }
-                    Err(_) => {}
+                    _ => {}
                 }
             }
         }
         _ => {}
-    };
+    }
 }
