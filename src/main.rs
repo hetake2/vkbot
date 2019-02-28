@@ -191,8 +191,10 @@ fn get_json_data(filenames: &str) -> Value {
 }
 
 fn main() {
-    // First database.
+    // First database for user storage.
     let mut d = DB::new("add.db");
+    // Second databse for checked users.
+    let mut d2 = DB::new("check.db");
 
     // Current date.
     let current_date: NaiveDate = Utc::today().naive_utc();
@@ -209,7 +211,7 @@ fn main() {
     // Create a HashMap to store parameters.
     let mut params_groups: Params = from_value(json!(
         {
-            "group_id" : "61440523",
+            "group_id" : "53664217",
             "sort" : "id_desc",
             "count" : "1000",
             "offset" : "0", // Don't change.
@@ -278,83 +280,57 @@ fn main() {
     }
     println!("\nTotal users in DataBase: {}\n", d.len());
 
+    // This part is about sending friend requests with messages.
     match get_input("Start send requests? 1 for Yes.").as_ref() {
         "1" => {
             for i in d.get_vec() {
                 let user_id = i;
-                let are_friends_params: Params = from_value(json!(
-                {
-                    "user_ids" : user_id.to_string(),
-                    "need_sign" : "1",
-                }))
-                .unwrap();
-                let response = are_friends(&api, are_friends_params);
-                match response {
-                    Ok(v) => {
-                        let json_data: Value = from_value(v).unwrap();
-                        let resp = json_data["response"].clone();
-                        let friend_status = resp["friend_status"].clone();
-                        if friend_status.as_u64().unwrap_or(5) != 1
-                            || friend_status.as_u64().unwrap_or(5) != 3
-                            || friend_status.as_u64().unwrap_or(5) != 2
-                        {
-                            let text = "Привет)";
-                            let mut params: Params = from_value(json!(
-                            {
-                                "user_id" : user_id.to_string(),
-                                "text" : text,
-                            }))
-                            .unwrap();
-                            let mut completed = false;
-                            while !completed {
-                                println!("\n{:?}", params);
-                                match add(&api, params.clone()) {
-                                    Ok(_) => completed = true,
-                                    Err(e) => match e {
-                                        API(e) => match e.code() {
-                                            14 => {
-                                                let json_data = e.extra();
-                                                let captcha_sid: String =
-                                                    from_value(json_data["captcha_sid"].clone())
-                                                        .unwrap();
-                                                let captcha_img: String =
-                                                    from_value(json_data["captcha_img"].clone())
-                                                        .unwrap();
-                                                println!("{}\n", captcha_img);
-                                                open::that(captcha_img).unwrap();
-                                                let captcha_key =
-                                                    get_input("\nWaiting for captcha...");
-                                                println!(
-                                                    "sid = {}, key = {}",
-                                                    captcha_sid, captcha_key
-                                                );
-                                                params.insert(
-                                                    "captcha_sid".into(),
-                                                    captcha_sid.into(),
-                                                );
-                                                params.insert(
-                                                    "captcha_key".into(),
-                                                    captcha_key.into(),
-                                                );
-
-                                                sleep(Duration::from_secs(5));
-                                            }
-                                            _ => println!(
-                                                "{:?}",
-                                                to_string_pretty(&json!(e.extra()))
-                                            ),
-                                        },
-                                        _ => {}
-                                    },
-                                }
-                                //sleep(Duration::from_secs(300));
+                if !d2.contains(user_id) {
+                    //let greetings_file = get_json_data("greetings.json");
+                    //let greetings = greetings_file["greetings"].clone();
+                    //let text = greetings[""].clone();
+                    let text = "Добрый день)";
+                    let mut params: Params = from_value(json!(
+                    {
+                        "user_id" : user_id.to_string(),
+                        "text" : text,
+                    }))
+                    .unwrap();
+                    let mut completed = false;
+                    while !completed {
+                        println!("\nDEBUG: {:?}", params);
+                        match add(&api, params.clone()) {
+                            Ok(_) => {
+                                d2.add(user_id);
+                                completed = true
                             }
+                            Err(e) => match e {
+                                API(e) => match e.code() {
+                                    14 => {
+                                        let json_data = e.extra();
+                                        let captcha_sid: String =
+                                            from_value(json_data["captcha_sid"].clone()).unwrap();
+                                        let captcha_img: String =
+                                            from_value(json_data["captcha_img"].clone()).unwrap();
+                                        println!("Captcha URL: {}\n", captcha_img);
+                                        open::that(captcha_img).unwrap();
+                                        let captcha_key = get_input("\nEnter the captcha below:");
+                                        println!("sid = {}, key = {}", captcha_sid, captcha_key);
+                                        params.insert("captcha_sid".into(), captcha_sid.into());
+                                        params.insert("captcha_key".into(), captcha_key.into());
+
+                                        sleep(Duration::from_secs(5));
+                                    }
+                                    _ => println!("{:?}", to_string_pretty(&json!(e.extra()))),
+                                },
+                                _ => {}
+                            },
                         }
+                        //sleep(Duration::from_secs(300));
                     }
-                    Err(e) => {}
                 }
             }
         }
         _ => {}
-    };
+    }
 }
