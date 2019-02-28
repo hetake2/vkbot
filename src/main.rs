@@ -11,14 +11,16 @@ use chrono::{NaiveDate, Utc};
 use lib::*;
 use rvk::{
     error::Error::API,
-    methods::{friends::add, friends::are_friends, groups::get_members},
+    methods::{friends::add, groups::get_members},
     Params,
 };
 use serde_json::{from_value, json, Value};
 
 fn main() {
-    // First database.
+    // First database for user storage.
     let d = DB::new("add.db");
+    // Second databse for checked users.
+    let d2 = DB::new("check.db");
 
     // Current date.
     let current_date: NaiveDate = Utc::today().naive_utc();
@@ -29,7 +31,7 @@ fn main() {
     // Create a HashMap to store parameters.
     let mut params_groups: Params = from_value(json!(
         {
-            "group_id" : "61440523",
+            "group_id" : "53664217",
             "sort" : "id_desc",
             "count" : "1000",
             "offset" : "0", // Don't change.
@@ -98,42 +100,35 @@ fn main() {
     }
     println!("\nTotal users in DataBase: {}\n", d.len());
 
+    // This part is about sending friend requests with messages.
     match get_input("Start send requests? 1 for Yes.").as_ref() {
         "1" => {
             for i in d.get_vec() {
                 let user_id = i;
-                let are_friends_params: Params = from_value(json!(
-                {
-                    "user_ids" : user_id.to_string(),
-                    "need_sign" : "1",
-                }))
-                .unwrap();
-                let response = are_friends(&api, are_friends_params);
-                match response {
-                    Ok(v) => {
-                        let json_data: Value = from_value(v).unwrap();
-                        let resp = json_data["response"].clone();
-                        let friend_status = resp["friend_status"].clone();
-                        if !vec![1, 2, 3].contains(&from_value(friend_status).unwrap()) {
-                            let text = "Привет)";
-                            let mut params: Params = from_value(json!(
-                            {
-                                "user_id" : user_id.to_string(),
-                                "text" : text,
-                            }))
-                            .unwrap();
-                            let mut completed = false;
-                            while !completed {
-                                println!("\n{:?}", params);
-                                match add(&api, params.clone()) {
-                                    Ok(_) => completed = true,
-                                    Err(API(e)) => error_handler(e, &mut params),
-                                    _ => {}
-                                }
+                if !d2.contains(user_id) {
+                    //let greetings_file = get_json_data("greetings.json");
+                    //let greetings = greetings_file["greetings"].clone();
+                    //let text = greetings[""].clone();
+                    let text = "Добрый день)";
+                    let mut params: Params = from_value(json!(
+                    {
+                        "user_id" : user_id.to_string(),
+                        "text" : text,
+                    }))
+                    .unwrap();
+                    let mut completed = false;
+                    while !completed {
+                        println!("\nDEBUG: {:?}", params);
+                        match add(&api, params.clone()) {
+                            Ok(_) => {
+                                d2.add(user_id);
+                                completed = true
                             }
+                            Err(API(e)) => error_handler(e, &mut params),
+                            _ => {}
                         }
+                        //sleep(Duration::from_secs(300));
                     }
-                    _ => {}
                 }
             }
         }
