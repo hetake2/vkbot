@@ -34,9 +34,13 @@ pub fn error_handler(e: APIError, params: &mut Params) {
             open::that(captcha_img).unwrap();
             let captcha_key = get_input("\nWaiting for captcha...");
             println!("sid = {}, key = {}", captcha_sid, captcha_key);
-            params.insert("captcha_sid".into(), captcha_sid.into());
-            params.insert("captcha_key".into(), captcha_key.into());
-
+            params.extend(
+                from_value::<Params>(json!({
+                    "captcha_sid": captcha_sid,
+                    "captcha_key": captcha_key
+                }))
+                .unwrap(),
+            );
             sleep(Duration::from_secs(5));
         }
         6 => {
